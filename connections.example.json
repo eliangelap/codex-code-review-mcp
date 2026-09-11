@@ -1,0 +1,18 @@
+{
+    "connections": [
+        {
+            "id": "gitlab-corporativo",
+            "provider": "gitlab",
+            "baseUrl": "https://gitlab.example.com",
+            "tokenEnv": "CODE_REVIEW_GITLAB_CORPORATIVO_TOKEN",
+            "allowedRepositories": ["grupo/api-exemplo"]
+        },
+        {
+            "id": "github",
+            "provider": "github",
+            "baseUrl": "https://api.github.com",
+            "tokenEnv": "CODE_REVIEW_GITHUB_TOKEN",
+            "allowedRepositories": ["organization/repository"]
+        }
+    ]
+}

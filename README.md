@@ -49,7 +49,16 @@ As permissões efetivas também dependem das regras do projeto, como visibilidad
 codex mcp add code-review \
   --env CODE_REVIEW_GITLAB_CORPORATIVO_TOKEN="$CODE_REVIEW_GITLAB_CORPORATIVO_TOKEN" \
   --env CODE_REVIEW_GITHUB_TOKEN="$CODE_REVIEW_GITHUB_TOKEN" \
-  -- node /Users/emenezes/projetos/codex-code-review-mcp/src/server.mjs
+  -- node /Users/seu-usuario/projetos/codex-code-review-mcp/src/server.mjs
+```
+
+No Windows, execute o equivalente no PowerShell, ajustando o caminho do projeto:
+
+```powershell
+codex mcp add code-review `
+  --env CODE_REVIEW_GITLAB_CORPORATIVO_TOKEN="$env:CODE_REVIEW_GITLAB_CORPORATIVO_TOKEN" `
+  --env CODE_REVIEW_GITHUB_TOKEN="$env:CODE_REVIEW_GITHUB_TOKEN" `
+  -- node C:\Users\seu-usuario\projetos\codex-code-review-mcp\src\server.mjs
 ```
 
 Inclua um `--env` para cada variável `tokenEnv` configurada no seu `connections.json`.

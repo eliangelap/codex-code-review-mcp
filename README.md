@@ -7,6 +7,7 @@ Servidor MCP local para revisar manualmente Merge Requests do GitLab e Pull Requ
 - Não executa webhook, polling ou tarefas automáticas.
 - Não faz merge, aprovação formal, exclusão ou resolve discussões automaticamente.
 - Só permite os projetos e repositórios definidos na allowlist da conexão.
+- A allowlist aceita repositórios exatos (`owner/repository`) e, somente para GitHub, todos os repositórios diretos de um owner (`owner/*`).
 - Não publica sem uma prévia aprovada nesta conversa e um `actionId` ainda válido.
 - Não responde nem prepara correções para threads já resolvidas; o estado é revalidado imediatamente antes da publicação.
 - Para cada thread não resolvida, o Codex avalia tecnicamente a observação. Quando válida, prepara a correção, cria o commit na branch de origem e responde à mesma thread com o SHA do commit; quando inválida, responde à mesma thread com justificativa técnica. Todas as escritas permanecem sujeitas à confirmação explícita.
@@ -16,6 +17,8 @@ Servidor MCP local para revisar manualmente Merge Requests do GitLab e Pull Requ
 
 Crie `~/.config/codex-code-review-mcp/connections.json` a partir de [connections.example.json](connections.example.json). O arquivo contém apenas URLs, allowlists e os nomes das variáveis de ambiente; não coloque tokens nele.
 
+Use `owner/repository` para autorizar apenas um repositório. Em conexões GitHub, `owner/*` autoriza qualquer repositório diretamente pertencente ao owner; outros formatos com `*` são rejeitados na inicialização.
+
 Exemplo de variáveis globais no macOS:
 
 ```zsh
@@ -23,7 +26,7 @@ export CODE_REVIEW_GITLAB_CORPORATIVO_TOKEN='glpat-...'
 export CODE_REVIEW_GITHUB_TOKEN='github_pat_...'
 ```
 
-Reinicie o Codex após definir as variáveis. Aplicações abertas pelo Finder podem não herdar variáveis exportadas no shell; nesse caso, defina-as no ambiente que inicia o Codex e confirme com `code_review_list_connections` antes de usar o servidor.
+Reinicie o Codex após alterar as variáveis ou o `connections.json`. Aplicações abertas pelo Finder podem não herdar variáveis exportadas no shell; nesse caso, defina-as no ambiente que inicia o Codex e confirme com `code_review_list_connections` antes de usar o servidor.
 
 Para GitHub Enterprise Server, use a URL da API da instância, normalmente `https://github.empresa.com/api/v3`. Para GitLab self-managed, informe a URL raiz da instância; o servidor usa `/api/v4` automaticamente.
 

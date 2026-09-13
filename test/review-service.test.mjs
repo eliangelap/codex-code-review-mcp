@@ -18,7 +18,7 @@ function context(paths, headSha = "sha-1") {
     };
 }
 
-function serviceFor(currentContext) {
+function serviceFor(currentContext, allowedRepositories = ["acme/web"]) {
     const client = {
         getContext: async () => currentContext,
         getCurrentUsername: async () => "dev",
@@ -32,13 +32,25 @@ function serviceFor(currentContext) {
                 provider: "github",
                 baseUrl: "https://api.github.com",
                 tokenEnv: "TOKEN",
-                allowedRepositories: ["acme/web"],
+                allowedRepositories,
             },
         ],
         environment: { TOKEN: "secret" },
         clients: { github: client },
     });
 }
+
+test("loads a GitHub review context through an owner wildcard", async () => {
+    const service = serviceFor(context(["src/index.ts"]), ["acme/*"]);
+
+    const result = await service.loadContext({
+        connectionId: "github",
+        repository: "acme/web",
+        number: 3,
+    });
+
+    assert.equal(result.repository, "acme/web");
+});
 
 test("requires the React review skill for TSX changes and publishes only after confirmation", async () => {
     const service = serviceFor(context(["src/@presentation/page.tsx"]));

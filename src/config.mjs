@@ -29,6 +29,13 @@ export function validateConnection(connection, ids = new Set()) {
     if (!Array.isArray(connection.allowedRepositories) || connection.allowedRepositories.length === 0) {
         throw new ConfigurationError(`Connection ${connection.id} must define allowedRepositories.`);
     }
+    for (const repository of connection.allowedRepositories) {
+        if (!isValidAllowedRepository(connection.provider, repository)) {
+            throw new ConfigurationError(
+                `Connection ${connection.id} has an invalid allowed repository pattern: ${repository}.`,
+            );
+        }
+    }
     let baseUrl;
     try {
         baseUrl = new URL(connection.baseUrl).toString().replace(/\/$/, "");
@@ -42,7 +49,7 @@ export function validateConnection(connection, ids = new Set()) {
 export function resolveConnection(connections, connectionId, repository, environment = process.env) {
     const connection = connections.find((item) => item.id === connectionId);
     if (!connection) throw new ValidationError(`Unknown connectionId ${connectionId}.`);
-    if (!connection.allowedRepositories.includes(repository))
+    if (!connection.allowedRepositories.some((allowedRepository) => matchesRepository(connection.provider, allowedRepository, repository)))
         throw new AuthorizationError(`Repository ${repository} is not allowed for connection ${connectionId}.`);
     const token = environment[connection.tokenEnv];
     if (!token)
@@ -50,4 +57,21 @@ export function resolveConnection(connections, connectionId, repository, environ
             `Missing token environment variable ${connection.tokenEnv} for connection ${connectionId}.`,
         );
     return { ...connection, token };
+}
+
+function isValidAllowedRepository(provider, repository) {
+    if (typeof repository !== "string" || repository.length === 0) return false;
+    if (!repository.includes("*")) return true;
+    return provider === "github" && /^[^/*]+\/\*$/.test(repository);
+}
+
+function matchesRepository(provider, allowedRepository, repository) {
+    if (allowedRepository === repository) return true;
+    if (provider !== "github" || !allowedRepository.endsWith("/*")) return false;
+
+    const owner = allowedRepository.slice(0, -2);
+    const prefix = `${owner}/`;
+    const name = repository.startsWith(prefix) ? repository.slice(prefix.length) : "";
+
+    return name.length > 0 && !name.includes("/");
 }

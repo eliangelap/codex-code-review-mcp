@@ -71,7 +71,7 @@ Abra uma nova sessão e use `/mcp` para verificar o servidor.
 ## Uso previsto
 
 1. Peça ao Codex para carregar o contexto, por exemplo: “Revise o PR 42 em `acme/web`, conexão `github`”.
-2. O Codex identifica a skill de review exigida, analisa o diff e apresenta uma prévia dos comentários.
+2. O Codex identifica a skill de review exigida, analisa o diff e apresenta uma prévia dos comentários. Cada achado de code review deve ser `inline`, apontando para uma linha efetivamente alterada do arquivo; comentários gerais são rejeitados nesse fluxo.
 3. Confirme explicitamente o lote exibido.
 4. O Codex executa a ação pendente com `confirmedByUser: true`.
 

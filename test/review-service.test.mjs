@@ -13,7 +13,7 @@ function context(paths, headSha = "sha-1") {
         sourceBranch: "feature/change",
         headSha,
         baseSha: "base",
-        files: paths.map((filename) => ({ filename })),
+        files: paths.map((filename) => ({ filename, patch: "@@ -10,1 +10,2 @@\n old\n+new" })),
         discussions: {},
     };
 }
@@ -52,18 +52,18 @@ test("loads a GitHub review context through an owner wildcard", async () => {
     assert.equal(result.repository, "acme/web");
 });
 
-test("requires the React review skill for TSX changes and publishes only after confirmation", async () => {
+test("requires the React review skill and an inline changed-line comment before publishing", async () => {
     const service = serviceFor(context(["src/@presentation/page.tsx"]));
     const preview = await service.previewReview({
         connectionId: "github",
         repository: "acme/web",
         number: 3,
-        comments: [{ kind: "general", body: "Finding." }],
+        comments: [{ kind: "inline", path: "src/@presentation/page.tsx", line: 11, body: "Finding." }],
     });
     assert.equal(preview.requiredSkill, "code-review-reactjs");
     await assert.rejects(service.execute({ actionId: preview.actionId, confirmedByUser: false }), ValidationError);
     assert.deepEqual((await service.execute({ actionId: preview.actionId, confirmedByUser: true })).published, [
-        { kind: "general", body: "Finding." },
+        { kind: "inline", path: "src/@presentation/page.tsx", line: 11, body: "Finding." },
     ]);
 });
 
@@ -74,7 +74,7 @@ test("blocks unsupported stacks before previewing a review", async () => {
             connectionId: "github",
             repository: "acme/web",
             number: 3,
-            comments: [{ kind: "general", body: "Finding." }],
+            comments: [{ kind: "inline", path: "src/main.py", line: 11, body: "Finding." }],
         }),
         ValidationError,
     );
@@ -87,7 +87,7 @@ test("blocks publication when the remote head changed", async () => {
         connectionId: "github",
         repository: "acme/web",
         number: 3,
-        comments: [{ kind: "general", body: "Finding." }],
+        comments: [{ kind: "inline", path: "src/index.ts", line: 11, body: "Finding." }],
     });
     service.clients.github.getContext = async () => context(["src/index.ts"], "sha-2");
     await assert.rejects(service.execute({ actionId: preview.actionId, confirmedByUser: true }), ValidationError);
@@ -190,7 +190,7 @@ test("formats comment and reviewer-response previews as readable Markdown before
         connectionId: "github",
         repository: "acme/web",
         number: 3,
-        comments: [{ kind: "inline", path: "src/index.ts", line: 12, body: "Este nome pode ser mais descritivo." }],
+        comments: [{ kind: "inline", path: "src/index.ts", line: 11, body: "Este nome pode ser mais descritivo." }],
     });
     const response = await service.previewReviewerResponse({
         connectionId: "github",
@@ -200,10 +200,33 @@ test("formats comment and reviewer-response previews as readable Markdown before
     });
 
     assert.match(review.previewMarkdown, /# Prévia dos comentários/);
-    assert.match(review.previewMarkdown, /Comentário em `src\/index\.ts:12`/);
+    assert.match(review.previewMarkdown, /Comentário em `src\/index\.ts:11`/);
     assert.match(review.previewMarkdown, /Este nome pode ser mais descritivo\./);
     assert.match(response.previewMarkdown, /# Prévia das respostas/);
     assert.match(response.previewMarkdown, /Ajuste confirmado\./);
+});
+
+test("rejects general comments and lines outside the changed diff in a review", async () => {
+    const service = serviceFor(context(["src/index.ts"]));
+
+    await assert.rejects(
+        service.previewReview({
+            connectionId: "github",
+            repository: "acme/web",
+            number: 3,
+            comments: [{ kind: "general", body: "Finding." }],
+        }),
+        /inline comments anchored to changed lines/,
+    );
+    await assert.rejects(
+        service.previewReview({
+            connectionId: "github",
+            repository: "acme/web",
+            number: 3,
+            comments: [{ kind: "inline", path: "src/index.ts", line: 10, body: "Finding." }],
+        }),
+        /must belong to the changed diff/,
+    );
 });
 
 test("does not preview a correction or response for a resolved GitLab discussion", async () => {

@@ -10,6 +10,17 @@ function apiBaseUrl(baseUrl) {
     return url.toString().replace(/\/$/, "");
 }
 
+function inlinePosition(context, comment) {
+    const side = comment.side || "RIGHT";
+    const file = context.files?.find((item) => [item.new_path, item.old_path].includes(comment.path));
+    return {
+        position_type: "text",
+        new_path: file?.new_path || comment.path,
+        old_path: file?.old_path || comment.path,
+        ...(side === "LEFT" ? { old_line: comment.line } : { new_line: comment.line }),
+    };
+}
+
 export class GitLabClient {
     constructor(connection, dependencies = {}) {
         this.connection = connection;
@@ -60,12 +71,12 @@ export class GitLabClient {
                         { method: "POST", body: { body: comment.body } },
                     );
                 const body = { body: comment.body };
-                if (comment.position)
+                if (comment.kind === "inline" || comment.position)
                     body.position = {
                         base_sha: context.baseSha,
                         start_sha: context.startSha,
                         head_sha: context.headSha,
-                        ...comment.position,
+                        ...(comment.position || inlinePosition(context, comment)),
                     };
                 return this.http.request(`/projects/${project}/merge_requests/${context.number}/discussions`, {
                     method: "POST",

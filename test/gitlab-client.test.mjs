@@ -45,3 +45,40 @@ for (const baseUrl of ["https://gitlab.coamo.com.br", "https://gitlab.coamo.com.
         );
     });
 }
+
+test("publishes an inline review comment as a discussion positioned on the changed line", async () => {
+    const calls = [];
+    const client = new GitLabClient(
+        { baseUrl: "https://gitlab.coamo.com.br", token: "secret" },
+        {
+            fetchImplementation: async (url, options) => {
+                calls.push({ url, options });
+                return response({ id: "discussion-1" });
+            },
+        },
+    );
+
+    await client.publishComments(
+        {
+            repository,
+            number: 2,
+            baseSha: "base",
+            startSha: "start",
+            headSha: "head",
+        },
+        [{ kind: "inline", path: "src/index.ts", line: 14, body: "Finding." }],
+    );
+
+    assert.deepEqual(JSON.parse(calls[0].options.body), {
+        body: "Finding.",
+        position: {
+            base_sha: "base",
+            start_sha: "start",
+            head_sha: "head",
+            position_type: "text",
+            new_path: "src/index.ts",
+            old_path: "src/index.ts",
+            new_line: 14,
+        },
+    });
+});

@@ -27,6 +27,63 @@ function validateComments(comments) {
         if (!comment?.body?.trim()) throw new ValidationError("Every comment requires a non-empty body.");
         if (!["inline", "general", "reply"].includes(comment.kind))
             throw new ValidationError("Comment kind must be inline, general, or reply.");
+        if (
+            comment.kind === "inline" &&
+            (!comment.path?.trim() || !Number.isInteger(comment.line) || comment.line < 1)
+        )
+            throw new ValidationError("Inline comments require a file path and a positive line number.");
+        if (comment.side && !["LEFT", "RIGHT"].includes(comment.side))
+            throw new ValidationError("Inline comment side must be LEFT or RIGHT.");
+    }
+}
+
+function changedLines(patch) {
+    if (typeof patch !== "string") return null;
+    const lines = { LEFT: new Set(), RIGHT: new Set() };
+    let oldLine;
+    let newLine;
+    for (const row of patch.split("\n")) {
+        const header = /^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(row);
+        if (header) {
+            oldLine = Number(header[1]);
+            newLine = Number(header[2]);
+            continue;
+        }
+        if (oldLine === undefined || newLine === undefined || row.startsWith("\\")) continue;
+        if (row.startsWith("+")) {
+            lines.RIGHT.add(newLine);
+            newLine += 1;
+        } else if (row.startsWith("-")) {
+            lines.LEFT.add(oldLine);
+            oldLine += 1;
+        } else {
+            oldLine += 1;
+            newLine += 1;
+        }
+    }
+    return lines;
+}
+
+function inlineTarget(context, comment) {
+    if (context.provider === "gitlab") {
+        const file = context.files.find((item) => [item.new_path, item.old_path].includes(comment.path));
+        return file && { file };
+    }
+    const file = context.files.find((item) => item.filename === comment.path);
+    return file && { file };
+}
+
+function validateReviewComments(context, comments) {
+    if (comments.some((comment) => comment.kind !== "inline"))
+        throw new ValidationError("Code reviews require inline comments anchored to changed lines.");
+    for (const comment of comments) {
+        const target = inlineTarget(context, comment);
+        const side = comment.side || "RIGHT";
+        const lines = changedLines(target?.file.diff || target?.file.patch);
+        if (!target || !lines?.[side]?.has(comment.line))
+            throw new ValidationError(
+                `Inline comment ${comment.path}:${comment.line} must belong to the changed diff on the ${side} side.`,
+            );
     }
 }
 
@@ -128,6 +185,7 @@ export class ReviewService {
             throw new ValidationError(
                 "Review is blocked because no supported code-review skill applies to this change.",
             );
+        validateReviewComments(context, comments);
         assertNoResolvedThreadReplies(context, comments);
         const action = this.actions.create({
             type: "comments",

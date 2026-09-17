@@ -19,7 +19,12 @@ const tools = [
         targetSchema(),
         true,
     ),
-    tool("code_review_preview_review", "Previews review comments. Never publishes.", commentsSchema(), true),
+    tool(
+        "code_review_preview_review",
+        "Previews inline review comments anchored to changed file lines. Never publishes.",
+        commentsSchema(),
+        true,
+    ),
     tool(
         "code_review_preview_response",
         "Previews responses to reviewer observations. Never publishes.",
@@ -73,8 +78,8 @@ function commentsSchema() {
                 properties: {
                     kind: { type: "string", enum: ["inline", "general", "reply"] },
                     body: string(),
-                    path: string(),
-                    line: { type: "integer", minimum: 1 },
+                    path: string("Required for inline comments; changed file path."),
+                    line: { type: "integer", minimum: 1, description: "Required for inline comments; changed line." },
                     side: { type: "string", enum: ["LEFT", "RIGHT"] },
                     discussionId: string(),
                     commentId: { type: "integer", minimum: 1 },

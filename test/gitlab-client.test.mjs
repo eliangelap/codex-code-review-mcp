@@ -22,6 +22,7 @@ function createClient(baseUrl, calls) {
                     title: "Change",
                     author: { username: "dev" },
                     sha: "head",
+                    target_branch: "main",
                     diff_refs: { base_sha: "base", start_sha: "start" },
                 });
             },
@@ -35,6 +36,7 @@ for (const baseUrl of ["https://gitlab.coamo.com.br", "https://gitlab.coamo.com.
         const context = await createClient(baseUrl, calls).getContext(repository, 2);
 
         assert.equal(context.headSha, "head");
+        assert.equal(context.targetBranch, "main");
         assert.deepEqual(
             calls.sort(),
             [

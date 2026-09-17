@@ -15,13 +15,13 @@ const tools = [
     ),
     tool(
         "code_review_load_context",
-        "Loads a GitLab MR or GitHub PR and reports the mandatory review skill.",
+        "Loads a GitLab MR or GitHub PR, its source and target branches, and the mandatory review instructions.",
         targetSchema(),
         true,
     ),
     tool(
         "code_review_preview_review",
-        "Previews inline review comments anchored to changed file lines. Never publishes.",
+        "Previews review comments: inline comments must target changed lines; general comments are for findings outside the diff. Never publishes.",
         commentsSchema(),
         true,
     ),
@@ -176,7 +176,7 @@ lines.on("line", async (line) => {
                 capabilities: { tools: {} },
                 serverInfo: { name: "codex-code-review", version: "0.1.0" },
                 instructions:
-                    "Apply the required language-specific code-review skill. For each unresolved merge-request or pull-request review thread, assess whether the observation is technically valid. If it is valid, prepare a correction commit and a reply to that same thread; after explicit user confirmation, publish the correction first and reply with the resulting commit SHA. If it is not valid, prepare a technically justified reply to that same thread. Never call a write tool without explicit confirmation from the user in this conversation.",
+                    "For every code review, apply the instructions from the available applicable code-review skills. If the project directory is not available in the current Codex workspace, clone the repository with git clone before reviewing. Compare the merge-request or pull-request source branch with its target branch. Findings in changed code must be prepared as inline comments anchored to the corresponding changed line; findings in unchanged code must be prepared as general comments on the merge request or pull request. For each unresolved merge-request or pull-request review thread, assess whether the observation is technically valid. If it is valid, prepare a correction commit and a reply to that same thread; after explicit user confirmation, publish the correction first and reply with the resulting commit SHA. If it is not valid, prepare a technically justified reply to that same thread. Never call a write tool without explicit confirmation from the user in this conversation.",
             });
         else if (request.method === "tools/list") respond(request.id, { tools });
         else if (request.method === "tools/call") {

@@ -33,7 +33,7 @@ test("loads GitHub review-thread resolution state", async () => {
                     title: "Change",
                     user: { login: "dev" },
                     head: { ref: "feature/change", sha: "head" },
-                    base: { sha: "base" },
+                    base: { ref: "main", sha: "base" },
                 });
             },
         },
@@ -44,5 +44,6 @@ test("loads GitHub review-thread resolution state", async () => {
     assert.deepEqual(context.discussions.reviewThreads, [
         { isResolved: true, comments: { nodes: [{ databaseId: 42 }] } },
     ]);
+    assert.equal(context.targetBranch, "main");
     assert.equal(calls.find((call) => call.url === "https://github.example.com/api/graphql").options.method, "POST");
 });

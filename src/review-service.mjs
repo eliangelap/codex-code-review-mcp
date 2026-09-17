@@ -74,9 +74,10 @@ function inlineTarget(context, comment) {
 }
 
 function validateReviewComments(context, comments) {
-    if (comments.some((comment) => comment.kind !== "inline"))
-        throw new ValidationError("Code reviews require inline comments anchored to changed lines.");
     for (const comment of comments) {
+        if (comment.kind === "reply")
+            throw new ValidationError("Code reviews accept inline comments or general comments, not thread replies.");
+        if (comment.kind !== "inline") continue;
         const target = inlineTarget(context, comment);
         const side = comment.side || "RIGHT";
         const lines = changedLines(target?.file.diff || target?.file.patch);
@@ -85,6 +86,17 @@ function validateReviewComments(context, comments) {
                 `Inline comment ${comment.path}:${comment.line} must belong to the changed diff on the ${side} side.`,
             );
     }
+}
+
+function reviewInstruction(context, reviewSkill) {
+    if (!reviewSkill) return "No supported code-review skill was detected. Do not review or publish comments.";
+    return [
+        `Apply the ${reviewSkill} skill before drafting findings.`,
+        "If the project directory is not available in the current Codex workspace, clone the repository with git clone before reviewing.",
+        `Compare the source branch \`${context.sourceBranch}\` with the target branch \`${context.targetBranch || "the configured target branch"}\`.`,
+        "For a finding in changed code, prepare an inline comment anchored to its corresponding changed line.",
+        "For a finding in code that was not changed, prepare a general comment on the merge request or pull request.",
+    ].join(" ");
 }
 
 function replyThreadIsOpen(context, comment) {
@@ -172,9 +184,7 @@ export class ReviewService {
             connectionId: connection.id,
             reviewSkill,
             reviewAllowed: Boolean(reviewSkill),
-            instruction: reviewSkill
-                ? `Apply the ${reviewSkill} skill before drafting findings.`
-                : "No supported code-review skill was detected. Do not review or publish comments.",
+            instruction: reviewInstruction(context, reviewSkill),
         };
     }
 

@@ -11,6 +11,7 @@ function context(paths, headSha = "sha-1") {
         title: "Change",
         author: "dev",
         sourceBranch: "feature/change",
+        targetBranch: "main",
         headSha,
         baseSha: "base",
         files: paths.map((filename) => ({ filename, patch: "@@ -10,1 +10,2 @@\n old\n+new" })),
@@ -206,18 +207,16 @@ test("formats comment and reviewer-response previews as readable Markdown before
     assert.match(response.previewMarkdown, /Ajuste confirmado\./);
 });
 
-test("rejects general comments and lines outside the changed diff in a review", async () => {
+test("allows general comments for findings outside the diff and rejects inline lines outside it", async () => {
     const service = serviceFor(context(["src/index.ts"]));
 
-    await assert.rejects(
-        service.previewReview({
-            connectionId: "github",
-            repository: "acme/web",
-            number: 3,
-            comments: [{ kind: "general", body: "Finding." }],
-        }),
-        /inline comments anchored to changed lines/,
-    );
+    const preview = await service.previewReview({
+        connectionId: "github",
+        repository: "acme/web",
+        number: 3,
+        comments: [{ kind: "general", body: "Finding outside the changed diff." }],
+    });
+    assert.deepEqual(preview.comments, [{ kind: "general", body: "Finding outside the changed diff." }]);
     await assert.rejects(
         service.previewReview({
             connectionId: "github",
@@ -227,6 +226,24 @@ test("rejects general comments and lines outside the changed diff in a review", 
         }),
         /must belong to the changed diff/,
     );
+});
+
+test("instructs Codex to clone when needed and compare source and target branches", async () => {
+    const service = serviceFor(context(["src/index.ts"]));
+
+    const result = await service.loadContext({
+        connectionId: "github",
+        repository: "acme/web",
+        number: 3,
+    });
+
+    assert.equal(result.sourceBranch, "feature/change");
+    assert.equal(result.targetBranch, "main");
+    assert.match(result.instruction, /git clone/i);
+    assert.match(result.instruction, /feature\/change/);
+    assert.match(result.instruction, /main/);
+    assert.match(result.instruction, /inline/i);
+    assert.match(result.instruction, /general/i);
 });
 
 test("does not preview a correction or response for a resolved GitLab discussion", async () => {

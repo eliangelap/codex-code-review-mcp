@@ -11,7 +11,8 @@ Servidor MCP local para revisar manualmente Merge Requests do GitLab e Pull Requ
 - Não publica sem uma prévia aprovada nesta conversa e um `actionId` ainda válido.
 - Não responde nem prepara correções para threads já resolvidas; o estado é revalidado imediatamente antes da publicação.
 - Para cada thread não resolvida, o Codex avalia tecnicamente a observação. Quando válida, prepara a correção, cria o commit na branch de origem e responde à mesma thread com o SHA do commit; quando inválida, responde à mesma thread com justificativa técnica. Todas as escritas permanecem sujeitas à confirmação explícita.
-- Para review, o Codex deve aplicar `code-review-nodejs` ou `code-review-reactjs`. MRs/PRs sem stack suportada são bloqueados.
+- Para review, o Codex deve aplicar `code-review-nodejs` ou `code-review-reactjs`. MRs/PRs sem stack suportada são bloqueados. Se o diretório do projeto não estiver disponível no workspace atual, o Codex deve cloná-lo antes de revisar.
+- A análise compara a branch de origem da MR/PR com sua branch de destino. Achados no diff devem ser comentários inline em uma linha alterada; achados fora do diff devem ser comentários gerais (soltos) na MR/PR.
 
 ## Configuração
 
@@ -71,7 +72,7 @@ Abra uma nova sessão e use `/mcp` para verificar o servidor.
 ## Uso previsto
 
 1. Peça ao Codex para carregar o contexto, por exemplo: “Revise o PR 42 em `acme/web`, conexão `github`”.
-2. O Codex identifica a skill de review exigida, analisa o diff e apresenta uma prévia dos comentários. Cada achado de code review deve ser `inline`, apontando para uma linha efetivamente alterada do arquivo; comentários gerais são rejeitados nesse fluxo.
+2. O Codex identifica a skill de review exigida, garante acesso ao projeto (clonando-o quando necessário), compara a branch de origem com a de destino e apresenta uma prévia dos comentários. Achados no diff devem ser `inline`, apontando para uma linha efetivamente alterada; achados em código fora do diff devem ser comentários gerais.
 3. Confirme explicitamente o lote exibido.
 4. O Codex executa a ação pendente com `confirmedByUser: true`.
 

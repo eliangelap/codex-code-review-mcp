@@ -49,6 +49,7 @@ export class GitLabClient {
             author: mergeRequest.author?.username,
             reviewers: mergeRequest.reviewers?.map((item) => item.username) || [],
             sourceBranch: mergeRequest.source_branch,
+            targetBranch: mergeRequest.target_branch,
             headSha: mergeRequest.sha,
             baseSha: mergeRequest.diff_refs?.base_sha,
             startSha: mergeRequest.diff_refs?.start_sha,

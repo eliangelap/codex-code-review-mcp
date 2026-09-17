@@ -46,6 +46,7 @@ export class GitHubClient {
             author: pull.user?.login,
             reviewers: pull.requested_reviewers?.map((item) => item.login) || [],
             sourceBranch: pull.head.ref,
+            targetBranch: pull.base.ref,
             headSha: pull.head.sha,
             baseSha: pull.base.sha,
             files,

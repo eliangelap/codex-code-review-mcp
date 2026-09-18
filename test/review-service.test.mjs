@@ -97,6 +97,20 @@ test("loads a GitHub review context through an owner wildcard", async () => {
     assert.equal(result.repository, "acme/web");
 });
 
+test("selects the Laravel review skill for Laravel source paths", async () => {
+    const service = serviceFor(context(["app/Http/Middleware/EnsureBackofficeAuthorization.php"]));
+
+    const result = await service.loadContext({
+        connectionId: "github",
+        repository: "acme/web",
+        number: 3,
+    });
+
+    assert.equal(result.reviewSkill, "code-review-php-laravel");
+    assert.equal(result.reviewAllowed, true);
+    assert.match(result.instruction, /code-review-php-laravel/);
+});
+
 test("requires the React review skill and an inline changed-line comment before publishing", async () => {
     const service = serviceFor(context(["src/@presentation/page.tsx"]));
     const preview = await service.previewReview({

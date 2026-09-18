@@ -9,6 +9,15 @@ function detectReviewSkill(context) {
         context.provider === "gitlab"
             ? context.files.map((file) => file.new_path || file.old_path || "")
             : context.files.map((file) => file.filename || "");
+    if (
+        paths.some(
+            (path) =>
+                /\.php$/i.test(path) ||
+                /^(app|bootstrap|config|database|resources|routes|tests)\//.test(path) ||
+                /^(artisan|composer\.(json|lock))$/.test(path),
+        )
+    )
+        return "code-review-php-laravel";
     if (paths.some((path) => /\.(tsx|jsx)$/.test(path) || path.includes("/@presentation/")))
         return "code-review-reactjs";
     if (

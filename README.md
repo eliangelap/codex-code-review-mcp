@@ -11,7 +11,7 @@ Servidor MCP local para revisar manualmente Merge Requests do GitLab e Pull Requ
 - Não publica sem uma prévia aprovada nesta conversa e um `actionId` ainda válido.
 - Não responde nem prepara correções para threads já resolvidas; o estado é revalidado imediatamente antes da publicação.
 - Para cada thread não resolvida, o Codex avalia tecnicamente a observação. Quando válida, prepara a correção, cria o commit na branch de origem e responde à mesma thread com o SHA do commit; quando inválida, responde à mesma thread com justificativa técnica. Todas as escritas permanecem sujeitas à confirmação explícita.
-- Para review, o Codex deve aplicar `code-review-nodejs` ou `code-review-reactjs`. MRs/PRs sem stack suportada são bloqueados. Se o diretório do projeto não estiver disponível no workspace atual, o Codex deve cloná-lo antes de revisar.
+- Para review, o Codex deve aplicar `code-review-php-laravel`, `code-review-nodejs` ou `code-review-reactjs`. MRs/PRs sem stack suportada são bloqueados. O MCP reconhece Laravel por arquivos `.php`, diretórios `app/`, `bootstrap/`, `config/`, `database/`, `resources/`, `routes/` e `tests/`, e por `artisan` ou `composer.json`/`composer.lock`. Se o diretório do projeto não estiver disponível no workspace atual, o Codex deve cloná-lo antes de revisar.
 - A análise compara a branch de origem da MR/PR com sua branch de destino. Achados no diff devem ser comentários inline em uma linha alterada; achados fora do diff devem ser comentários gerais (soltos) na MR/PR.
 
 ## Configuração

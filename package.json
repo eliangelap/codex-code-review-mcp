@@ -6,7 +6,17 @@
     "type": "module",
     "scripts": {
         "start": "node src/server.mjs",
+        "start:api": "node src/http-server.mjs",
+        "start:web": "vite --host 127.0.0.1 --port 5599",
+        "build:web": "vite build",
         "test": "node --test"
+    },
+    "dependencies": {
+        "react": "^19.1.1",
+        "react-dom": "^19.1.1"
+    },
+    "devDependencies": {
+        "vite": "^7.1.7"
     },
     "engines": {
         "node": ">=20"

@@ -14,6 +14,12 @@ const tools = [
         true,
     ),
     tool(
+        "code_review_list_repositories",
+        "Lists visible GitHub repositories or GitLab repositories allowed by the connection configuration.",
+        object({ connectionId: string() }, ["connectionId"]),
+        true,
+    ),
+    tool(
         "code_review_load_context",
         "Loads a GitLab MR or GitHub PR, its source and target branches, and the mandatory review instructions.",
         targetSchema(),
@@ -142,6 +148,8 @@ async function execute(name, input) {
                 allowedRepositories,
                 tokenEnv,
             }));
+        case "code_review_list_repositories":
+            return service.listRepositories(input.connectionId);
         case "code_review_load_context":
             return service.loadContext(input);
         case "code_review_preview_review":

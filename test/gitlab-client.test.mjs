@@ -84,3 +84,19 @@ test("publishes an inline review comment as a discussion positioned on the chang
         },
     });
 });
+
+test("lists open merge requests for a project", async () => {
+    const calls = [];
+    const client = new GitLabClient(
+        { baseUrl: "https://gitlab.coamo.com.br", token: "secret" },
+        {
+            fetchImplementation: async (url) => {
+                calls.push(url);
+                return response([{ iid: 8, title: "Corrige login" }]);
+            },
+        },
+    );
+
+    assert.deepEqual(await client.listChangeRequests(repository), [{ number: 8, title: "Corrige login" }]);
+    assert.deepEqual(calls, [`${expectedBaseUrl}/projects/${project}/merge_requests?state=opened&per_page=100&page=1`]);
+});

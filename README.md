@@ -87,3 +87,14 @@ Requer Node.js 20 ou superior.
 ```zsh
 npm test
 ```
+
+## Interface local
+
+Com as variáveis de token e o `connections.json` configurados como descrito acima, execute em dois terminais:
+
+```powershell
+npm run start:api
+npm run start:web
+```
+
+A API é exposta somente em `http://localhost:9898` e a interface React em `http://localhost:5599`. A interface não recebe tokens: ela conversa com a API local, que mantém as mesmas regras de allowlist, prévia, expiração e confirmação explícita do MCP. Use `npm run build:web` para gerar a versão estática em `dist/`.

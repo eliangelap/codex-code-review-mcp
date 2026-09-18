@@ -2,7 +2,7 @@ import { PendingActions } from "./actions.mjs";
 import { GitHubClient } from "./github-client.mjs";
 import { GitLabClient } from "./gitlab-client.mjs";
 import { resolveConnection } from "./config.mjs";
-import { ValidationError } from "./errors.mjs";
+import { AuthorizationError, ValidationError } from "./errors.mjs";
 
 function detectReviewSkill(context) {
     const paths =
@@ -173,6 +173,35 @@ export class ReviewService {
     resolve(connectionId, repository) {
         const connection = resolveConnection(this.connections, connectionId, repository, this.environment);
         return { connection, client: this.clientFor(connection) };
+    }
+
+    async listRepositories(connectionId) {
+        const connection = this.connections.find((item) => item.id === connectionId);
+        if (!connection) throw new ValidationError(`Unknown connectionId ${connectionId}.`);
+        if (connection.provider === "gitlab") {
+            return {
+                connectionId: connection.id,
+                provider: connection.provider,
+                repositories: [...connection.allowedRepositories].sort((first, second) => first.localeCompare(second)),
+            };
+        }
+        const token = this.environment[connection.tokenEnv];
+        if (!token) throw new AuthorizationError(`Missing token environment variable ${connection.tokenEnv} for connection ${connectionId}.`);
+        const client = this.clientFor({ ...connection, token });
+        return {
+            connectionId: connection.id,
+            provider: connection.provider,
+            repositories: (await client.listRepositories()).sort((first, second) => first.localeCompare(second)),
+        };
+    }
+
+    async listChangeRequests({ connectionId, repository }) {
+        const { connection, client } = this.resolve(connectionId, repository);
+        return {
+            connectionId: connection.id,
+            provider: connection.provider,
+            changeRequests: await client.listChangeRequests(repository),
+        };
     }
 
     async loadContext({ connectionId, repository, number }) {

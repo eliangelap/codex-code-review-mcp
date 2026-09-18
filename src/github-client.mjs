@@ -71,6 +71,38 @@ export class GitHubClient {
         return (await this.http.request("/user")).login;
     }
 
+    async listRepositories() {
+        const repositories = [];
+        for (let page = 1; ; page += 1) {
+            const query = new URLSearchParams({
+                affiliation: "owner,collaborator,organization_member",
+                per_page: "100",
+                page: String(page),
+            });
+            const items = await this.http.request(`/user/repos?${query}`);
+            if (!Array.isArray(items)) throw new ValidationError("GitHub repository listing returned an invalid response.");
+            repositories.push(...items.map((item) => item.full_name).filter((name) => typeof name === "string"));
+            if (items.length < 100) break;
+        }
+        return repositories.sort((first, second) => first.localeCompare(second));
+    }
+
+    async listChangeRequests(repository) {
+        const { owner, repo } = splitRepository(repository);
+        const changeRequests = [];
+        for (let page = 1; ; page += 1) {
+            const items = await this.http.request(`/repos/${owner}/${repo}/pulls?state=open&per_page=100&page=${page}`);
+            if (!Array.isArray(items)) throw new ValidationError("GitHub pull request listing returned an invalid response.");
+            changeRequests.push(
+                ...items
+                    .filter((item) => Number.isInteger(item.number) && typeof item.title === "string")
+                    .map((item) => ({ number: item.number, title: item.title })),
+            );
+            if (items.length < 100) break;
+        }
+        return changeRequests;
+    }
+
     async publishComments(context, comments) {
         const { owner, repo } = splitRepository(context.repository);
         const base = `/repos/${owner}/${repo}`;

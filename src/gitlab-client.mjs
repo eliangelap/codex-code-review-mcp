@@ -1,5 +1,5 @@
 import { HttpClient, encodeRepository } from "./http-client.mjs";
-import { StaleChangeError } from "./errors.mjs";
+import { StaleChangeError, ValidationError } from "./errors.mjs";
 
 function apiBaseUrl(baseUrl) {
     const url = new URL(baseUrl);
@@ -60,6 +60,22 @@ export class GitLabClient {
 
     async getCurrentUsername() {
         return (await this.http.request("/user")).username;
+    }
+
+    async listChangeRequests(repository) {
+        const project = encodeRepository(repository);
+        const changeRequests = [];
+        for (let page = 1; ; page += 1) {
+            const items = await this.http.request(`/projects/${project}/merge_requests?state=opened&per_page=100&page=${page}`);
+            if (!Array.isArray(items)) throw new ValidationError("GitLab merge request listing returned an invalid response.");
+            changeRequests.push(
+                ...items
+                    .filter((item) => Number.isInteger(item.iid) && typeof item.title === "string")
+                    .map((item) => ({ number: item.iid, title: item.title })),
+            );
+            if (items.length < 100) break;
+        }
+        return changeRequests;
     }
 
     async publishComments(context, comments) {

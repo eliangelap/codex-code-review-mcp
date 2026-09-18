@@ -21,6 +21,8 @@ function context(paths, headSha = "sha-1") {
 
 function serviceFor(currentContext, allowedRepositories = ["acme/web"]) {
     const client = {
+        listRepositories: async () => ["acme/web"],
+        listChangeRequests: async () => [{ number: 3, title: "Change" }],
         getContext: async () => currentContext,
         getCurrentUsername: async () => "dev",
         publishComments: async (_context, comments) => comments,
@@ -40,6 +42,48 @@ function serviceFor(currentContext, allowedRepositories = ["acme/web"]) {
         clients: { github: client },
     });
 }
+
+test("lists GitHub repositories visible to the configured token", async () => {
+    const service = serviceFor(context(["src/index.ts"]));
+    service.clients.github.listRepositories = async () => ["acme/zebra", "acme/alpha"];
+
+    assert.deepEqual(await service.listRepositories("github"), {
+        connectionId: "github",
+        provider: "github",
+        repositories: ["acme/alpha", "acme/zebra"],
+    });
+});
+
+test("lists only the configured GitLab repositories", async () => {
+    const service = new ReviewService({
+        connections: [
+            {
+                id: "gitlab",
+                provider: "gitlab",
+                baseUrl: "https://gitlab.example.com",
+                tokenEnv: "GITLAB_TOKEN",
+                allowedRepositories: ["group/zebra", "group/alpha"],
+            },
+        ],
+    });
+
+    assert.deepEqual(await service.listRepositories("gitlab"), {
+        connectionId: "gitlab",
+        provider: "gitlab",
+        repositories: ["group/alpha", "group/zebra"],
+    });
+});
+
+test("lists open change requests only for an allowed repository", async () => {
+    const service = serviceFor(context(["src/index.ts"]));
+    service.clients.github.listChangeRequests = async () => [{ number: 8, title: "Fix login" }];
+
+    assert.deepEqual(await service.listChangeRequests({ connectionId: "github", repository: "acme/web" }), {
+        connectionId: "github",
+        provider: "github",
+        changeRequests: [{ number: 8, title: "Fix login" }],
+    });
+});
 
 test("loads a GitHub review context through an owner wildcard", async () => {
     const service = serviceFor(context(["src/index.ts"]), ["acme/*"]);

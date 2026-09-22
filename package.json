@@ -7,7 +7,8 @@
     "scripts": {
         "start": "node src/server.mjs",
         "start:api": "node src/http-server.mjs",
-        "start:web": "vite --host 127.0.0.1 --port 5599",
+        "start:web": "node src/web-server.mjs",
+        "start:web:client": "vite --host 127.0.0.1 --port 5599",
         "build:web": "vite build",
         "test": "node --test"
     },

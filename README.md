@@ -90,11 +90,10 @@ npm test
 
 ## Interface local
 
-Com as variáveis de token e o `connections.json` configurados como descrito acima, execute em dois terminais:
+Com as variáveis de token e o `connections.json` configurados como descrito acima, execute:
 
 ```powershell
-npm run start:api
 npm run start:web
 ```
 
-A API é exposta somente em `http://localhost:9898` e a interface React em `http://localhost:5599`. A interface não recebe tokens: ela conversa com a API local, que mantém as mesmas regras de allowlist, prévia, expiração e confirmação explícita do MCP. Use `npm run build:web` para gerar a versão estática em `dist/`.
+A API é exposta somente em `http://localhost:9898` e a interface React em `http://localhost:5599`. O comando inicia e encerra os dois serviços juntos. A interface não recebe tokens: ela conversa com a API local, que mantém as mesmas regras de allowlist, prévia, expiração e confirmação explícita do MCP. Use `npm run start:web:client` apenas quando a API já estiver em execução e `npm run build:web` para gerar a versão estática em `dist/`.

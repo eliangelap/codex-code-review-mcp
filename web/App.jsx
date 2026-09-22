@@ -98,7 +98,11 @@ export function App() {
 
     function updateTarget(event) {
         const { name, value } = event.target;
-        setTarget((current) => ({ ...current, [name]: value }));
+        setTarget((current) =>
+            name === "connectionId"
+                ? { ...current, connectionId: value, repository: "", number: "" }
+                : { ...current, [name]: value },
+        );
     }
 
     function updateComment(event) {
@@ -192,7 +196,7 @@ export function App() {
                 <h2>Destino</h2>
                 <form onSubmit={loadContext} className="form-grid">
                     <label>Conexão<select name="connectionId" value={target.connectionId} onChange={updateTarget} required>{connections.map((connection) => <option key={connection.id} value={connection.id}>{connection.id} · {connection.provider}</option>)}</select></label>
-                    <label>Repositório<input name="repository" list="repositories" value={target.repository} onChange={updateTarget} placeholder="owner/repository ou grupo/projeto" required /><datalist id="repositories">{repositories.map((repository) => <option key={repository} value={repository} />)}</datalist>{repositoriesLoading && <span>Carregando repositórios...</span>}{repositoriesError && <span className="repository-error">{repositoriesError}</span>}</label>
+                    <label>Repositório<select name="repository" value={target.repository} onChange={updateTarget} disabled={repositoriesLoading || Boolean(repositoriesError) || repositories.length === 0} required><option value="">{repositoriesLoading ? "Carregando repositórios..." : repositoriesError ? "Não foi possível carregar os repositórios" : "Selecione um repositório"}</option>{repositories.map((repository) => <option key={repository} value={repository}>{repository}</option>)}</select>{repositoriesError && <span className="repository-error">{repositoriesError}</span>}</label>
                     <label>Número da PR/MR<input name="number" list="change-requests" type="number" min="1" value={target.number} onChange={updateTarget} required /><datalist id="change-requests">{changeRequests.map((changeRequest) => <option key={changeRequest.number} value={changeRequest.number} label={changeRequest.title} />)}</datalist>{changeRequestsLoading && <span>Carregando PRs/MRs...</span>}{changeRequestsError && <span className="repository-error">{changeRequestsError}</span>}</label>
                     <button disabled={loading}>Carregar contexto</button>
                 </form>

@@ -5,8 +5,8 @@ import { AuthorizationError, ConfigurationError, NotFoundError, ValidationError 
 import { ReviewService } from "./review-service.mjs";
 
 const MAX_BODY_BYTES = 1_000_000;
-const CORS_HEADERS = {
-    "access-control-allow-origin": "http://localhost:5599",
+const LOCAL_WEB_ORIGINS = new Set(["http://localhost:5599", "http://127.0.0.1:5599"]);
+const RESPONSE_HEADERS = {
     "access-control-allow-methods": "GET, POST, OPTIONS",
     "access-control-allow-headers": "content-type",
     "content-type": "application/json; charset=utf-8",
@@ -16,8 +16,12 @@ function publicConnections(connections) {
     return connections.map(({ id, provider, baseUrl, allowedRepositories }) => ({ id, provider, baseUrl, allowedRepositories }));
 }
 
-function send(response, status, payload) {
-    response.writeHead(status, CORS_HEADERS);
+function send(response, request, status, payload) {
+    const origin = request.headers.origin;
+    const corsHeaders = LOCAL_WEB_ORIGINS.has(origin)
+        ? { "access-control-allow-origin": origin, vary: "Origin" }
+        : {};
+    response.writeHead(status, { ...RESPONSE_HEADERS, ...corsHeaders });
     response.end(JSON.stringify(payload));
 }
 
@@ -62,34 +66,34 @@ export function createHttpServer({ connections, service }) {
     return createServer(async (request, response) => {
         try {
             const url = new URL(request.url || "/", "http://127.0.0.1");
-            if (request.method === "OPTIONS") return send(response, 204, {});
-            if (request.method === "GET" && url.pathname === "/api/health") return send(response, 200, { status: "ok" });
+            if (request.method === "OPTIONS") return send(response, request, 204, {});
+            if (request.method === "GET" && url.pathname === "/api/health") return send(response, request, 200, { status: "ok" });
             if (request.method === "GET" && url.pathname === "/api/connections")
-                return send(response, 200, publicConnections(connections));
+                return send(response, request, 200, publicConnections(connections));
             if (request.method === "GET" && url.pathname === "/api/repositories") {
                 const connectionId = url.searchParams.get("connectionId");
                 if (!connectionId) throw new ValidationError("connectionId is required.");
-                return send(response, 200, await service.listRepositories(connectionId));
+                return send(response, request, 200, await service.listRepositories(connectionId));
             }
             if (request.method === "GET" && url.pathname === "/api/change-requests") {
                 const connectionId = url.searchParams.get("connectionId");
                 const repository = url.searchParams.get("repository");
                 if (!connectionId || !repository) throw new ValidationError("connectionId and repository are required.");
-                return send(response, 200, await service.listChangeRequests({ connectionId, repository }));
+                return send(response, request, 200, await service.listChangeRequests({ connectionId, repository }));
             }
-            if (request.method !== "POST") return send(response, 404, { error: "Endpoint not found." });
+            if (request.method !== "POST") return send(response, request, 404, { error: "Endpoint not found." });
 
             const input = await readJson(request);
             if (url.pathname === "/api/execute") {
                 if (input.confirmedByUser !== true)
                     throw new ValidationError("Explicit confirmation is required before publication.");
-                return send(response, 200, await service.execute(input));
+                return send(response, request, 200, await service.execute(input));
             }
             const endpoint = endpointFor(url.pathname, service);
-            if (!endpoint) return send(response, 404, { error: "Endpoint not found." });
-            return send(response, 200, await endpoint(input));
+            if (!endpoint) return send(response, request, 404, { error: "Endpoint not found." });
+            return send(response, request, 200, await endpoint(input));
         } catch (error) {
-            return send(response, statusFor(error), {
+            return send(response, request, statusFor(error), {
                 error: error instanceof Error ? error.message : "Unexpected server error.",
             });
         }

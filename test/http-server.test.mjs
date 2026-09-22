@@ -68,6 +68,17 @@ test("lists repositories for a connection", async () => {
     });
 });
 
+test("allows the local web interface served from either localhost address", async () => {
+    await withServer(async (port) => {
+        for (const origin of ["http://localhost:5599", "http://127.0.0.1:5599"]) {
+            const response = await fetch(`http://127.0.0.1:${port}/api/health`, { headers: { origin } });
+
+            assert.equal(response.headers.get("access-control-allow-origin"), origin);
+            assert.match(response.headers.get("vary") || "", /origin/i);
+        }
+    });
+});
+
 test("lists open change requests for a repository", async () => {
     await withServer(async (port) => {
         const response = await fetch(`http://127.0.0.1:${port}/api/change-requests?connectionId=github&repository=acme%2Fweb`);

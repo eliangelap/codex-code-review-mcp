@@ -10,7 +10,7 @@ Servidor MCP local para revisar manualmente Merge Requests do GitLab e Pull Requ
 - A allowlist aceita repositórios exatos (`owner/repository`) e, somente para GitHub, todos os repositórios diretos de um owner (`owner/*`).
 - Não publica sem uma prévia aprovada nesta conversa e um `actionId` ainda válido.
 - Não responde nem prepara correções para threads já resolvidas; o estado é revalidado imediatamente antes da publicação.
-- Para cada thread não resolvida, o Codex avalia tecnicamente a observação. Quando válida, prepara a correção, cria o commit na branch de origem e responde à mesma thread com o SHA do commit; quando inválida, responde à mesma thread com justificativa técnica. Todas as escritas permanecem sujeitas à confirmação explícita.
+- Para cada thread não resolvida, o Codex avalia tecnicamente a observação e cria planos separados para a correção e para a resposta. Os dois planos são apresentados para aprovação antes da preparação da prévia. Quando válida, prepara a correção, cria o commit na branch de origem e responde à mesma thread com o SHA do commit; quando inválida, responde à mesma thread com justificativa técnica. Todas as escritas permanecem sujeitas à confirmação explícita.
 - Para review, o Codex deve aplicar `code-review-php-laravel`, `code-review-nodejs` ou `code-review-reactjs`. MRs/PRs sem stack suportada são bloqueados. O MCP reconhece Laravel por arquivos `.php`, diretórios `app/`, `bootstrap/`, `config/`, `database/`, `resources/`, `routes/` e `tests/`, e por `artisan` ou `composer.json`/`composer.lock`. Se o diretório do projeto não estiver disponível no workspace atual, o Codex deve cloná-lo antes de revisar.
 - A análise compara a branch de origem da MR/PR com sua branch de destino. Achados no diff devem ser comentários inline em uma linha alterada; achados fora do diff devem ser comentários gerais (soltos) na MR/PR.
 
@@ -78,7 +78,7 @@ Abra uma nova sessão e use `/mcp` para verificar o servidor.
 
 As prévias de respostas e correções são exibidas em Markdown no prompt, incluindo os textos a enviar, mensagem de commit e conteúdo dos arquivos modificados. Revise esse conteúdo antes de confirmar.
 
-Para uma observação em thread não resolvida, peça para avaliá-la. Se ela for válida, o Codex prepara o diff, executa validações, revisa novamente e mostra o commit e a resposta antes de enviá-los. Após a confirmação, o MCP cria e envia o commit primeiro e responde à mesma thread com o SHA efetivamente criado. Se não for válida, mostra a justificativa técnica antes de publicá-la.
+Para uma observação em thread não resolvida, peça para avaliá-la. Antes de gerar qualquer prévia, o Codex cria e apresenta para aprovação um plano de correção e um plano de resposta. Se ela for válida, após a aprovação dos planos o Codex prepara o diff, executa validações, revisa novamente e mostra o commit e a resposta antes de enviá-los. Após a confirmação da prévia, o MCP cria e envia o commit primeiro e responde à mesma thread com o SHA efetivamente criado. Se não for válida, após a aprovação dos planos mostra a justificativa técnica antes de publicá-la.
 
 ## Desenvolvimento
 

@@ -184,7 +184,17 @@ lines.on("line", async (line) => {
                 capabilities: { tools: {} },
                 serverInfo: { name: "codex-code-review", version: "0.1.0" },
                 instructions:
-                    "For every code review, apply the instructions from the available applicable code-review skills. If the project directory is not available in the current Codex workspace, clone the repository with git clone before reviewing. Compare the merge-request or pull-request source branch with its target branch. Findings in changed code must be prepared as inline comments anchored to the corresponding changed line; findings in unchanged code must be prepared as general comments on the merge request or pull request. For each unresolved merge-request or pull-request review thread, assess whether the observation is technically valid. If it is valid, prepare a correction commit and a reply to that same thread; after explicit user confirmation, publish the correction first and reply with the resulting commit SHA. If it is not valid, prepare a technically justified reply to that same thread. Never call a write tool without explicit confirmation from the user in this conversation.",
+                    `For every code review, apply the instructions from the available applicable code-review skills.
+                    If the project directory is not available in the current Codex workspace, clone the repository with git clone before reviewing.
+                    Compare the merge-request or pull-request source branch with its target branch.
+                    Findings in changed code must be prepared as inline comments anchored to the corresponding changed line;
+                    findings in unchanged code must be prepared as general comments on the merge request or pull request.
+                    For each unresolved merge-request or pull-request review thread, assess whether the observation is technically valid.
+                    Before preparing any correction or thread reply, create a correction plan and a separate reply plan, then present both plans to the user for approval.
+                    If the observation is valid, after plan approval prepare a correction commit and a reply to that same thread;
+                    after explicit user confirmation of the preview, publish the correction first and reply with the resulting commit SHA.
+                    If it is not valid, after plan approval prepare a technically justified reply to that same thread.
+                    Never call a write tool without explicit confirmation from the user in this conversation.`,
             });
         else if (request.method === "tools/list") respond(request.id, { tools });
         else if (request.method === "tools/call") {

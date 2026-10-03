@@ -1,99 +1,223 @@
 # Codex Code Review MCP
 
-Servidor MCP local para revisar manualmente Merge Requests do GitLab e Pull Requests do GitHub, sempre com confirmação explícita antes de criar comentários, respostas ou commits.
+Servidor MCP local e interface web para revisar Merge Requests do GitLab e Pull Requests do GitHub. O projeto concentra a coleta de contexto, a preparação de comentários, respostas e correções, e só publica uma alteração remota após uma prévia e confirmação explícita da pessoa usuária.
 
-## Segurança e limites
+## O que o projeto faz
 
-- Não executa webhook, polling ou tarefas automáticas.
-- Não faz merge, aprovação formal, exclusão ou resolve discussões automaticamente.
-- Só permite os projetos e repositórios definidos na allowlist da conexão.
-- A allowlist aceita repositórios exatos (`owner/repository`) e, somente para GitHub, todos os repositórios diretos de um owner (`owner/*`).
-- Não publica sem uma prévia aprovada nesta conversa e um `actionId` ainda válido.
-- Não responde nem prepara correções para threads já resolvidas; o estado é revalidado imediatamente antes da publicação.
-- Para cada thread não resolvida, o Codex avalia tecnicamente a observação e cria planos separados para a correção e para a resposta. Os dois planos são apresentados para aprovação antes da preparação da prévia. Quando válida, prepara a correção, cria o commit na branch de origem e responde à mesma thread com o SHA do commit; quando inválida, responde à mesma thread com justificativa técnica. Todas as escritas permanecem sujeitas à confirmação explícita.
-- Para review, o Codex deve aplicar `code-review-php-laravel`, `code-review-nodejs` ou `code-review-reactjs`. MRs/PRs sem stack suportada são bloqueados. O MCP reconhece Laravel por arquivos `.php`, diretórios `app/`, `bootstrap/`, `config/`, `database/`, `resources/`, `routes/` e `tests/`, e por `artisan` ou `composer.json`/`composer.lock`. Se o diretório do projeto não estiver disponível no workspace atual, o Codex deve cloná-lo antes de revisar.
-- A análise compara a branch de origem da MR/PR com sua branch de destino. Achados no diff devem ser comentários inline em uma linha alterada; achados fora do diff devem ser comentários gerais (soltos) na MR/PR.
+- Conecta-se a instâncias GitLab (SaaS ou self-managed) e GitHub (incluindo GitHub Enterprise Server).
+- Restringe o acesso a conexões e repositórios previamente autorizados em uma allowlist.
+- Carrega PRs/MRs abertas, branches, diff, arquivos alterados e discussões.
+- Detecta a stack alterada e exige a skill de revisão correspondente: Laravel/PHP, Node.js ou React.
+- Prepara comentários de review, comentários gerais, respostas a threads e commits de correção.
+- Oferece a mesma operação por MCP (stdin/stdout JSON-RPC) e por uma UI React servida apenas em localhost.
 
-## Configuração
+Não é um bot de revisão autônomo: não executa polling, webhooks ou publicação automática.
 
-Crie `~/.config/codex-code-review-mcp/connections.json` a partir de [connections.example.json](connections.example.json). O arquivo contém apenas URLs, allowlists e os nomes das variáveis de ambiente; não coloque tokens nele.
+## Salvaguardas de publicação
 
-Use `owner/repository` para autorizar apenas um repositório. Em conexões GitHub, `owner/*` autoriza qualquer repositório diretamente pertencente ao owner; outros formatos com `*` são rejeitados na inicialização.
+O fluxo de escrita foi desenhado para ser deliberado e verificável:
 
-Exemplo de variáveis globais no macOS:
+1. A conexão precisa existir no arquivo de configuração e o repositório precisa constar na sua allowlist.
+2. Uma prévia cria um `actionId` temporário, válido por 30 minutos.
+3. A publicação requer `confirmedByUser: true`; o `actionId` é consumido uma única vez.
+4. Antes de publicar, o servidor consulta novamente a PR/MR e bloqueia a ação se o SHA da branch de origem mudou.
+5. Respostas e correções só são aceitas para threads ainda abertas. O estado é revalidado imediatamente antes do envio.
+6. Correções e respostas a observações são limitadas a PRs/MRs cujo autor é o usuário autenticado pelo token.
 
-```zsh
+O servidor não realiza merge, aprovação formal, encerramento de discussão ou exclusão automática.
+
+## Arquitetura
+
+| Componente | Responsabilidade |
+| --- | --- |
+| `src/server.mjs` | Adaptador MCP JSON-RPC por stdin/stdout; expõe as ferramentas ao Codex. |
+| `src/review-service.mjs` | Orquestra configuração, carregamento de contexto, validações, prévias e publicação. |
+| `src/actions.mjs` | Armazena ações pendentes em memória, com expiração e consumo único. |
+| `src/github-client.mjs` | Integra REST e GraphQL do GitHub para PRs, threads, comentários e commits. |
+| `src/gitlab-client.mjs` | Integra API v4 do GitLab para MRs, discussões, comentários e commits. |
+| `src/http-server.mjs` | API HTTP local em `127.0.0.1:9898`, reutilizando o mesmo serviço e regras. |
+| `src/web-server.mjs` e `web/` | Inicializa a API e Vite; a UI React fica em `127.0.0.1:5599`. |
+| `test/` | Testes nativos do Node para configuração, clientes, API HTTP e regras do fluxo. |
+
+As ações pendentes existem somente em memória. Reiniciar o processo invalida prévias que ainda não foram publicadas.
+
+## Compatibilidade e requisitos
+
+- Node.js 20 ou superior.
+- Um token GitLab ou GitHub acessível por variável de ambiente.
+- Acesso de rede à instância configurada.
+- Para uma revisão feita pelo Codex, o repositório deve estar no workspace; se não estiver, a instrução MCP determina cloná-lo antes da análise.
+
+Instale as dependências:
+
+```bash
+npm install
+```
+
+## Configuração de conexões
+
+Copie [connections.example.json](connections.example.json) para um dos locais abaixo:
+
+- padrão: `~/.config/codex-code-review-mcp/connections.json`;
+- personalizado: defina a variável `CODE_REVIEW_CONNECTIONS_FILE` com o caminho absoluto do arquivo.
+
+O arquivo contém URLs, identificadores, allowlists e o nome da variável de ambiente do token. **Nunca inclua tokens nele.**
+
+```json
+{
+  "connections": [
+    {
+      "id": "gitlab-corporativo",
+      "provider": "gitlab",
+      "baseUrl": "https://gitlab.example.com",
+      "tokenEnv": "CODE_REVIEW_GITLAB_CORPORATIVO_TOKEN",
+      "allowedRepositories": ["grupo/api-exemplo"]
+    },
+    {
+      "id": "github",
+      "provider": "github",
+      "baseUrl": "https://api.github.com",
+      "tokenEnv": "CODE_REVIEW_GITHUB_TOKEN",
+      "allowedRepositories": ["organization/*"]
+    }
+  ]
+}
+```
+
+`allowedRepositories` aceita o nome exato do repositório (`owner/repository` ou `grupo/projeto`). Apenas no GitHub, `owner/*` autoriza os repositórios diretamente pertencentes a esse owner; outros curingas são rejeitados ao iniciar.
+
+Para GitLab self-managed, informe a URL raiz da instância; o cliente acrescenta `/api/v4` quando necessário. Para GitHub Enterprise Server, informe normalmente a URL da API, como `https://github.empresa.com/api/v3`.
+
+Exemplos de variáveis de ambiente:
+
+```powershell
+$env:CODE_REVIEW_GITLAB_CORPORATIVO_TOKEN = "glpat-..."
+$env:CODE_REVIEW_GITHUB_TOKEN = "github_pat_..."
+```
+
+```bash
 export CODE_REVIEW_GITLAB_CORPORATIVO_TOKEN='glpat-...'
 export CODE_REVIEW_GITHUB_TOKEN='github_pat_...'
 ```
 
-Reinicie o Codex após alterar as variáveis ou o `connections.json`. Aplicações abertas pelo Finder podem não herdar variáveis exportadas no shell; nesse caso, defina-as no ambiente que inicia o Codex e confirme com `code_review_list_connections` antes de usar o servidor.
+Reinicie o processo do MCP após alterar variáveis ou a configuração. Em macOS, aplicações abertas pelo Finder podem não herdar variáveis exportadas pelo shell.
 
-Para GitHub Enterprise Server, use a URL da API da instância, normalmente `https://github.empresa.com/api/v3`. Para GitLab self-managed, informe a URL raiz da instância; o servidor usa `/api/v4` automaticamente.
+## Permissões recomendadas
 
-## Permissões no GitLab
+### GitLab
 
-O servidor autentica na API REST do GitLab pelo cabeçalho `PRIVATE-TOKEN` e chama os endpoints de Merge Request, alterações, discussões, usuário autenticado e criação de commits. Prefira um **Project Access Token** (para um único projeto) ou um **Group Access Token** (para vários projetos da mesma área), limitado aos repositórios informados em `allowedRepositories`.
+O cliente usa o cabeçalho `PRIVATE-TOKEN` e a API REST. Prefira Project Access Token para um projeto ou Group Access Token para um conjunto limitado de projetos.
 
-| Uso das tools | Escopo do token | Papel mínimo no projeto | Observações |
+| Operação | Escopo | Papel mínimo | Observação |
 | --- | --- | --- | --- |
-| Carregar contexto e gerar prévias (`code_review_load_context`, `code_review_preview_*`) | `read_api` | Reporter | Lê MR, diff, discussões e o usuário autenticado; não publica nada. |
-| Publicar comentários novos ou respostas (`code_review_execute` para uma prévia de review/resposta) | `api` | Reporter | O escopo `api` é necessário porque a publicação é feita pela API; o comentário ficará em nome do bot/usuário dono do token. |
-| Criar commit de correção na branch de origem (`code_review_execute` para uma prévia de correção) | `api` | Developer | Também exige permissão de push para a branch de origem. Em branch protegida, inclua explicitamente o bot/usuário em **Allowed to push and merge** ou use a regra de acesso aplicável. |
+| Ler MR, diff, discussões e criar prévia | `read_api` | Reporter | Não publica. |
+| Publicar comentário ou resposta | `api` | Reporter | O comentário é atribuído ao dono do token. |
+| Criar commit na branch de origem | `api` | Developer | Exige permissão de push; em branch protegida, configure a regra apropriada. |
 
-Para usar todas as tools com um único token, conceda somente o escopo **`api`** e o papel **Developer** no projeto. Não é necessário habilitar `write_repository`: esta integração cria commits pela API REST, e esse escopo é exclusivo para Git-over-HTTP. Também não são necessários `sudo`, `admin_mode`, permissões de merge, de aprovação formal, de exclusão ou de gerenciamento do projeto.
+Para cobrir todas as operações com um único token, use `api` e papel Developer. `write_repository` não é necessário, pois os commits são criados pela API REST, não por Git-over-HTTP.
 
-Como as prévias de resposta e correção só são permitidas para MRs cuja autoria coincide com o usuário autenticado, um Project/Group Access Token deve ser usado apenas se o respectivo bot for o autor do MR. Para revisar e comentar MRs de outras pessoas, use um token de um usuário ou bot com acesso ao projeto; correções continuam restritas aos MRs de sua própria autoria.
+### GitHub
 
-As permissões efetivas também dependem das regras do projeto, como visibilidade, restrições de branch protegida e `CODEOWNERS`. Use um token com validade curta, rotacione-o e mantenha-o apenas na variável de ambiente indicada pela conexão.
+O token deve poder ler repositórios, Pull Requests, arquivos/diffs e comentários. Para publicar, também deve ter permissão de escrever comentários de issue/review; para correções, precisa poder atualizar a branch de origem. Em GitHub Enterprise Server, confirme que a API GraphQL está disponível: ela é consultada para verificar se uma review thread foi resolvida.
 
-## Registro no Codex
+Use tokens de menor privilégio, com validade curta e rotação regular.
 
-```zsh
+## Registro como MCP no Codex
+
+No macOS/Linux, ajuste o caminho do projeto e execute:
+
+```bash
 codex mcp add code-review \
   --env CODE_REVIEW_GITLAB_CORPORATIVO_TOKEN="$CODE_REVIEW_GITLAB_CORPORATIVO_TOKEN" \
   --env CODE_REVIEW_GITHUB_TOKEN="$CODE_REVIEW_GITHUB_TOKEN" \
-  -- node /Users/seu-usuario/projetos/codex-code-review-mcp/src/server.mjs
+  -- node /caminho/para/codex-code-review-mcp/src/server.mjs
 ```
 
-No Windows, execute o equivalente no PowerShell, ajustando o caminho do projeto:
+No Windows PowerShell:
 
 ```powershell
 codex mcp add code-review `
   --env CODE_REVIEW_GITLAB_CORPORATIVO_TOKEN="$env:CODE_REVIEW_GITLAB_CORPORATIVO_TOKEN" `
   --env CODE_REVIEW_GITHUB_TOKEN="$env:CODE_REVIEW_GITHUB_TOKEN" `
-  -- node C:\Users\seu-usuario\projetos\codex-code-review-mcp\src\server.mjs
+  -- node C:\caminho\para\codex-code-review-mcp\src\server.mjs
 ```
 
-Inclua um `--env` para cada variável `tokenEnv` configurada no seu `connections.json`.
+Inclua um `--env` para cada `tokenEnv` existente no arquivo de conexões. Abra uma nova sessão e use `/mcp` para confirmar que o servidor está disponível.
 
-Abra uma nova sessão e use `/mcp` para verificar o servidor.
+## Ferramentas MCP
 
-## Uso previsto
+| Ferramenta | Tipo | Finalidade |
+| --- | --- | --- |
+| `code_review_list_connections` | Leitura | Lista conexões sem expor tokens. |
+| `code_review_list_repositories` | Leitura | Lista repositórios permitidos/visíveis para uma conexão. |
+| `code_review_load_context` | Leitura | Carrega PR/MR, branches, arquivos, diff e instruções de revisão. |
+| `code_review_preview_review` | Prévia | Monta comentários inline ou gerais sem publicar. |
+| `code_review_preview_response` | Prévia | Monta respostas para observações de uma thread aberta. |
+| `code_review_preview_correction` | Prévia | Mostra commit de correção e respostas antes do envio. |
+| `code_review_execute` | Escrita | Publica exatamente uma prévia já confirmada. |
 
-1. Peça ao Codex para carregar o contexto, por exemplo: “Revise o PR 42 em `acme/web`, conexão `github`”.
-2. O Codex identifica a skill de review exigida, garante acesso ao projeto (clonando-o quando necessário), compara a branch de origem com a de destino e apresenta uma prévia dos comentários. Achados no diff devem ser `inline`, apontando para uma linha efetivamente alterada; achados em código fora do diff devem ser comentários gerais.
-3. Confirme explicitamente o lote exibido.
-4. O Codex executa a ação pendente com `confirmedByUser: true`.
+Uma revisão é bloqueada quando a alteração não corresponde a uma stack suportada. A detecção é feita pelos arquivos modificados:
 
-As prévias de respostas e correções são exibidas em Markdown no prompt, incluindo os textos a enviar, mensagem de commit e conteúdo dos arquivos modificados. Revise esse conteúdo antes de confirmar.
+- Laravel/PHP: arquivos `.php`, `artisan`, `composer.*` ou diretórios Laravel usuais;
+- React: `.jsx`, `.tsx` ou caminhos com `@presentation`;
+- Node.js: `.js`, `.ts`, `.mjs`, `.cjs` ou caminhos com `@server`/`@worker`.
 
-Para uma observação em thread não resolvida, peça para avaliá-la. Antes de gerar qualquer prévia, o Codex cria e apresenta para aprovação um plano de correção e um plano de resposta. Se ela for válida, após a aprovação dos planos o Codex prepara o diff, executa validações, revisa novamente e mostra o commit e a resposta antes de enviá-los. Após a confirmação da prévia, o MCP cria e envia o commit primeiro e responde à mesma thread com o SHA efetivamente criado. Se não for válida, após a aprovação dos planos mostra a justificativa técnica antes de publicá-la.
+Comentários de achados no diff precisam ser `inline` e apontar para uma linha efetivamente modificada, do lado `RIGHT` (novo) ou `LEFT` (anterior). Achados fora do diff devem ser comentários gerais.
 
-## Desenvolvimento
+## Fluxo de uso
 
-Requer Node.js 20 ou superior.
+1. Carregue o contexto, por exemplo: “Revise o PR 42 em `acme/web`, na conexão `github`”.
+2. O Codex identifica a skill exigida, compara a branch de origem com a de destino e monta uma prévia de comentários.
+3. Revise a prévia e confirme explicitamente nesta conversa.
+4. O Codex chama `code_review_execute` com o `actionId` e `confirmedByUser: true`.
 
-```zsh
-npm test
-```
+Para uma observação existente, primeiro solicite a avaliação técnica. Antes de preparar uma resposta ou correção, o Codex deve apresentar separadamente um plano de correção e um plano de resposta. Quando a observação for válida, a correção é publicada antes da resposta, que recebe o SHA efetivo do commit. Quando for inválida, apenas a justificativa técnica é publicada na mesma thread.
 
-## Interface local
+## Interface web local
 
-Com as variáveis de token e o `connections.json` configurados como descrito acima, execute:
+Com os tokens e o arquivo de conexões já configurados:
 
-```powershell
+```bash
 npm run start:web
 ```
 
-A API é exposta somente em `http://localhost:9898` e a interface React em `http://localhost:5599`. O comando inicia e encerra os dois serviços juntos. A interface não recebe tokens: ela conversa com a API local, que mantém as mesmas regras de allowlist, prévia, expiração e confirmação explícita do MCP. Use `npm run start:web:client` apenas quando a API já estiver em execução e `npm run build:web` para gerar a versão estática em `dist/`.
+O comando inicia conjuntamente:
+
+- API HTTP: `http://localhost:9898`;
+- interface React: `http://localhost:5599`.
+
+A API escuta apenas em `127.0.0.1` e aceita CORS somente das origens locais da interface. A UI nunca recebe o token; ela chama a API local, que preserva allowlist, prévia, expiração e confirmação. Use `npm run start:web:client` quando a API já estiver ativa e `npm run build:web` para gerar os arquivos estáticos em `dist/`.
+
+Endpoints locais disponíveis:
+
+| Método | Rota | Finalidade |
+| --- | --- | --- |
+| `GET` | `/api/health` | Health check. |
+| `GET` | `/api/connections` | Conexões públicas, sem tokens. |
+| `GET` | `/api/repositories?connectionId=...` | Repositórios permitidos/visíveis. |
+| `GET` | `/api/change-requests?connectionId=...&repository=...` | PRs/MRs abertas. |
+| `POST` | `/api/context` | Contexto de uma PR/MR. |
+| `POST` | `/api/preview/review` | Prévia de review. |
+| `POST` | `/api/preview/response` | Prévia de resposta. |
+| `POST` | `/api/preview/correction` | Prévia de correção e resposta. |
+| `POST` | `/api/execute` | Executa uma prévia confirmada. |
+
+## Desenvolvimento e validação
+
+| Comando | Descrição |
+| --- | --- |
+| `npm start` | Inicia o servidor MCP. |
+| `npm run start:api` | Inicia somente a API HTTP local. |
+| `npm run start:web` | Inicia API e interface local. |
+| `npm run start:web:client` | Inicia somente o Vite em `127.0.0.1:5599`. |
+| `npm run build:web` | Gera a interface estática em `dist/`. |
+| `npm test` | Executa a suíte de testes com `node --test`. |
+
+Os testes cobrem expiração e confirmação de ações, allowlist, configuração, clientes GitHub/GitLab, detecção de stack, validação de comentários inline, proteção contra atualização remota, estado de threads e API HTTP.
+
+## Limitações atuais
+
+- As prévias pendentes não sobrevivem ao reinício do processo.
+- A interface permite preparar uma entrada por vez; a API e o MCP aceitam lotes de comentários.
+- A listagem de arquivos da PR/MR usa páginas de até 100 itens conforme a API remota; para mudanças maiores, valide se a instância fornece todos os arquivos necessários à análise.
+- Somente Laravel/PHP, Node.js e React são elegíveis para o fluxo de revisão automatizado pelo MCP.
